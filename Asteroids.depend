@@ -1,0 +1,22 @@
+# depslib dependency file v1.0
+1648140952 source:e:\spring (21-22)\computer graphics\asteroids\main.cpp
+	<windows.h>
+	<math.h>
+	<vector>
+	<GL/glut.h>
+	<iostream>
+
+1641651816 c:\users\asus\downloads\freeglut-mingw-3.0.0-1.mp\freeglut\include\gl\glut.h
+	"freeglut_std.h"
+
+1641651816 c:\users\asus\downloads\freeglut-mingw-3.0.0-1.mp\freeglut\include\gl\freeglut_std.h
+	<windows.h>
+	<EGL/egl.h>
+	<GLES/gl.h>
+	<GLES2/gl2.h>
+	<OpenGL/gl.h>
+	<OpenGL/glu.h>
+	<GL/gl.h>
+	<GL/glu.h>
+	<stdlib.h>
+
