@@ -1,10 +1,13 @@
 # depslib dependency file v1.0
-1648140952 source:e:\spring (21-22)\computer graphics\asteroids\main.cpp
+1648759816 source:e:\spring (21-22)\computer graphics\asteroids\main.cpp
 	<windows.h>
 	<math.h>
 	<vector>
 	<GL/glut.h>
 	<iostream>
+	<time.h>
+	<algorithm>
+	<stdlib.h>
 
 1641651816 c:\users\asus\downloads\freeglut-mingw-3.0.0-1.mp\freeglut\include\gl\glut.h
 	"freeglut_std.h"
