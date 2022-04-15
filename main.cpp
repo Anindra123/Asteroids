@@ -24,6 +24,7 @@
 
 
 */
+
 #include<windows.h>
 #include<math.h>
 #include<vector>
@@ -36,7 +37,7 @@
 #include<stdio.h>
 #include<string.h>
 #include<mmsystem.h>
-#define EB_TIMER 5
+#define EB_TIMER 10
 #define ES_SPAWNTIMER 100
 #define SM_SPAWNTIMER 300
 #define S_HITCOUNT 3
@@ -44,21 +45,32 @@
 
 using namespace std;
 
-//timer method
+/* timer methods */
 void startMenuTimer(int);
 void crashShipScene(int);
 void gameTimer(int);
 void gameOverTimer(int);
+void instructionTimer(int);
 
-//menus
+/*
+    Callback methods
+*/
 void menu();
 void gameOverMenu();
 void instructionMenu();
 void stageSelector();
 
-//helper method
+/* Helper Methods */
 void displayText(char* text,void* font,double xpos,double ypos,
                  GLbyte r,GLbyte g,GLbyte b);
+double generateRandD(double fmin,double fmax);
+double toRadians(double angle);
+double toDegrees(double rad);
+void translate2D(double x,double y);
+void rotate2D(double angle);
+void scale2d(double xscale,double yscale);
+void menuBar();
+char* getScore(int scoreVal);
 
 
 //spaceship object
@@ -76,34 +88,41 @@ struct asteroid{
     vector<double> xcoords,ycoords;
 };
 
+//ship bullet object
 struct bullet{
     bool isDestroyed = false;
     double bx,by,x,y;
 };
 
+//enemy ship bullet object
 struct enemyBullet{
     bool isDestroyed = false;
     double ebx,eby,x,y;
     vector<double> xcoords,ycoords;
 };
 
+
+//enemy ship object
 struct enemyShip{
     bool isDestroyed = false;
     double x,y,dx,dy,angle;
     vector<double> xcoords,ycoords;
 };
 
+//background stars
 struct star{
     double x,y;
 };
 
+
+//moon stage circles
 struct moonCircle{
     float moonx,moony,radius;
     int triangleAmount = 40;
     float pi = 2.0f * 3.1416f;
 };
 
-
+//space mine object
 struct spaceMine{
     double x,y,dx,dy;
     bool isDestroyed = false;
@@ -111,6 +130,9 @@ struct spaceMine{
 
 };
 
+
+
+//global variables
 spaceShip s;
 vector<bullet> vecBullet;
 vector<enemyBullet> vecEnemyBullet;
@@ -120,7 +142,8 @@ vector<star> stars;
 vector<enemyShip> eships;
 vector<spaceMine> spaceMines;
 
-//configurations
+//global variables
+//initial configuration
 const int w = 640, h = 480;
 double maxW,maxH;
 int score = 0,lives = 3;
@@ -129,11 +152,67 @@ exitGame = false,vIns = false;
 int upKey=0,downKey = 0,leftKey = 0,rightKey = 0,crashTimer = 0,
 stage = 1,pauseTimer = 0,highscore = 0,stageTimer = 0,
 bulletTimer  = EB_TIMER,sHitCount = S_HITCOUNT,
-esSpawnTimer = ES_SPAWNTIMER,gameOverOpt = 1,startMenuOpt = 1,
+esSpawnTimer = ES_SPAWNTIMER,gameOverOpt = 1,startMenuOpt = 3,
 smSpawnTimer = SM_SPAWNTIMER;
 float bgR,bgG,bgB;
 void init(int,int);
 
+/*
+    Space objects initializations
+*/
+void initSpaceShip();
+void initAsteroids(double xval,double yval,int numberOfAsteroids,double aSize);
+void createRandomAsteroids(int noOfAsteroids);
+void generateMoonCircles();
+void generateStars();
+void spawnEnemyShip();
+void spawnExampleEnemyShip();
+void spawnExampleSpaceMine();
+void spawnSpaceMine();
+void initEnemyBullets();
+
+/*
+    Collision Detection methods
+*/
+int detectCollisionAB(bullet* b,asteroid* a);
+int detectCollisionAS(double xcoords,double ycoords,asteroid* a);
+int detectCollisionSE(double xcoords,double ycoords,enemyShip* es);
+int detectCollisionSEB(double xcoords,double ycoords,enemyBullet* eb);
+int detectCollisionSSM(double xcoords,double ycoords,spaceMine* sm);
+
+/* apply ship thrust method */
+void accelerateShip();
+
+
+/* Object removal checking methods */
+bool removeSpaceMine(spaceMine sm);
+bool removeEnemySpaceShip(enemyShip es);
+bool removeBullets(bullet b);
+bool removeAsteroid(asteroid a);
+bool removeEnemyBullet(enemyBullet eb);
+
+/* Glut shapes drawing methods */
+void drawAsteroids(asteroid* a);
+void drawMoonCircle(moonCircle* c);
+void drawStars(star* s);
+void drawSpaceMine(spaceMine* sm);
+void drawMoonCircle(moonCircle* c);
+void drawBullet(bullet* b);
+void drawSpaceShipLives(int p);
+void drawCurrSpaceShipLives(int p);
+void drawSpaceShip(spaceShip* s);
+void drawEnemySpaceShip(enemyShip* es);
+void drawSpaceShipHit(spaceShip *s);
+
+/* game start initializations */
+void initGame();
+
+/*keyboard key press methods */
+void keyInput(int key,int x,int y);
+void gameKeys(unsigned char key,int x,int y);
+
+
+/* generates random double between two double */
 double generateRandD(double fmin,double fmax){
     double f;
     f = fmin+(fmax-fmin)*(rand()%0x7fff)/32767.0;
@@ -148,6 +227,7 @@ void displayText(char* text,void* font,double xpos,double ypos,GLbyte r,GLbyte g
     }
 }
 
+/* clears initial screen */
 void initBg(){
      glClearColor(0.0f,0.0f,0.0f,1.0f);
 }
@@ -155,6 +235,7 @@ void initBg(){
 double toRadians(double angle){
     return 3.1416/180 * angle;
 }
+
 double toDegrees(double rad){
     return 180/3.1416 * rad;
 }
@@ -178,10 +259,17 @@ glBegin(GL_QUADS);
         glVertex2d(2.0,2.0);
         glVertex2d(15.0,2.0);
 glEnd();
-
-
 }
 
+
+char* getScore(int scoreVal){
+    int length = snprintf(NULL,0,"%d",scoreVal);
+    char* str = (char*) malloc(length+1);
+    snprintf(str,length+1,"%d",scoreVal);
+    free(str);
+    return str;
+
+}
 
 //initialize spaceship coordinates
 void initSpaceShip(){
@@ -204,8 +292,9 @@ void initSpaceShip(){
 
 
 
-
+//initialize asteroid coordinates
 void initAsteroids(double xval,double yval,int numberOfAsteroids,double aSize){
+
     double theta,r,x,y;
 
     for(int i=0;i<numberOfAsteroids;i++){
@@ -231,7 +320,7 @@ void initAsteroids(double xval,double yval,int numberOfAsteroids,double aSize){
 }
 
 
-
+//generate a random set of asteroids
 void createRandomAsteroids(int noOfAsteroids){
     for(int i=0;i<noOfAsteroids;i++){
             initAsteroids(generateRandD(0.0,maxW),generateRandD(0.0,maxH),1,3.0);
@@ -239,7 +328,11 @@ void createRandomAsteroids(int noOfAsteroids){
 }
 
 
+//generate a random set of moon circles for background
 void generateMoonCircles(){
+    if(circles.size() > 0){
+        circles.clear();
+    }
     for(int i=0;i<20;i++){
         moonCircle c;
         c.moonx = (float) generateRandD(-100.0,maxW);
@@ -250,6 +343,8 @@ void generateMoonCircles(){
 
 }
 
+//generate random set of stars with x,y coordinates
+//for background
 void generateStars(){
     if(stars.size() > 0){
         stars.clear();
@@ -263,7 +358,8 @@ void generateStars(){
 
 }
 
-
+/* create a space ship object
+and insert it onto a list */
 void spawnEnemyShip(){
 
     if(eships.size() > 0){
@@ -292,6 +388,57 @@ void spawnEnemyShip(){
 
 }
 
+/* this enemy ship created for instruction */
+void spawnExampleEnemyShip(){
+    if(eships.size() > 0){
+        eships.clear();
+    }
+    enemyShip es;
+
+    es.x = (maxW/2.0)-20.0;
+
+    es.y = maxH - 50.0;
+
+    double scaleX = 4;
+    double scaleY = 5.5;
+    es.xcoords.push_back(cos(toRadians(90))*scaleX);
+    es.ycoords.push_back(sin(toRadians(90))*scaleY);
+    es.xcoords.push_back(cos(toRadians(225))*scaleX);
+    es.ycoords.push_back(sin(toRadians(225))*scaleY);
+    es.xcoords.push_back(cos(toRadians(315))*scaleX);
+    es.ycoords.push_back(sin(toRadians(315))*scaleY);
+    eships.push_back(es);
+
+}
+
+
+void spawnExampleSpaceMine(){
+    if(spaceMines.size() > 1){
+        spaceMines.clear();
+    }
+    spaceMine sm;
+    sm.x = (maxW/2.0)-20.0;
+
+    sm.y = maxH - 70.0;
+    double scaleX = 4;
+    double scaleY = 5.5;
+    sm.xcoords.push_back(cos(toRadians(90))*scaleX);
+    sm.ycoords.push_back(sin(toRadians(10))*scaleY);
+    sm.xcoords.push_back(cos(toRadians(225))*scaleX);
+    sm.ycoords.push_back(sin(toRadians(225))*scaleY);
+    sm.xcoords.push_back(cos(toRadians(315))*scaleX);
+    sm.ycoords.push_back(sin(toRadians(315))*scaleY);
+    sm.xcoords.push_back(cos(toRadians(90))*scaleX);
+    sm.ycoords.push_back(-sin(toRadians(10))*scaleY);
+    sm.xcoords.push_back(cos(toRadians(315))*scaleX);
+    sm.ycoords.push_back(-sin(toRadians(315))*scaleY);
+    sm.xcoords.push_back(cos(toRadians(225))*scaleX);
+    sm.ycoords.push_back(-sin(toRadians(225))*scaleY);
+
+    spaceMines.push_back(sm);
+}
+/* create a space mine object
+and insert it into list */
 void spawnSpaceMine(){
     if(spaceMines.size() > 1){
         spaceMines.clear();
@@ -355,85 +502,6 @@ void initEnemyBullets(){
         eb.eby = 5.0 * cos(toRadians(eships[i].angle));
         vecEnemyBullet.push_back(eb);
         break;
-    }
-}
-
-void drawAsteroids(asteroid* a){
-    glColor3ub(100,100,100);
-    glBegin(GL_POLYGON);
-    for(int j=0;j<a->nVertices;j++){
-        glVertex2d(a->xcoords[j],a->ycoords[j]);
-    }
-    glEnd();
-
-}
-
-void drawAsteroidsHit(asteroid* a){
-    glColor4ub(255,255,255,50);
-    glBegin(GL_POLYGON);
-    for(int j=0;j<a->nVertices;j++){
-        glVertex2d(a->xcoords[j],a->ycoords[j]);
-    }
-    glEnd();
-
-}
-
-
-void drawMoonCircle(moonCircle* c){
-    glColor3ub(120, 120, 120);
-    glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(c->moonx,c->moony);
-        for(int i=0;i<=c->triangleAmount;i++){
-            glVertex2f(c->moonx+(c->radius * cos(i*c->pi/c->triangleAmount)),
-                       c->moony+(c->radius * sin(i*c->pi/c->triangleAmount)));
-        }
-    glEnd();
-}
-
-
-void drawStars(star* s){
-    glColor3ub(255,255,255);
-    glBegin(GL_POINTS);
-            glVertex2d(s->x,s->y);
-    glEnd();
-}
-
-
-void drawSpaceMine(spaceMine* sm){
-    glColor3ub(255,0,0);
-
-    glBegin(GL_TRIANGLES);
-        glVertex2d(sm->xcoords[0],sm->ycoords[0]);
-        glVertex2d(sm->xcoords[1],sm->ycoords[1]);
-        glVertex2d(sm->xcoords[2],sm->ycoords[2]);
-    glEnd();
-
-    translate2D(0,-4.0);
-    glBegin(GL_TRIANGLES);
-        glVertex2d(sm->xcoords[3],sm->ycoords[3]);
-        glVertex2d(sm->xcoords[4],sm->ycoords[4]);
-        glVertex2d(sm->xcoords[5],sm->ycoords[5]);
-    glEnd();
-
-}
-void accelerateShip(){
-    double acc = 1.0;
-
-    s.vx = - acc * sin(toRadians(s.angle));
-    s.vy = acc * cos(toRadians(s.angle));
-
-
-    if(s.vx > 3.0){
-        s.vx = 3.0;
-    }
-    if(s.vx < -3.0){
-         s.vx = -3.0;
-    }
-    if(s.vy > 3.0){
-        s.vy = 3.0;
-    }
-    if(s.vy < -3.0){
-        s.vy = -3.0;
     }
 }
 
@@ -550,6 +618,26 @@ int detectCollisionSSM(double xcoords,double ycoords,spaceMine* sm){
 
 }
 
+void accelerateShip(){
+    double acc = 1.0;
+
+    s.vx = - acc * sin(toRadians(s.angle));
+    s.vy = acc * cos(toRadians(s.angle));
+
+
+    if(s.vx > 3.0){
+        s.vx = 3.0;
+    }
+    if(s.vx < -3.0){
+         s.vx = -3.0;
+    }
+    if(s.vy > 3.0){
+        s.vy = 3.0;
+    }
+    if(s.vy < -3.0){
+        s.vy = -3.0;
+    }
+}
 
 bool removeSpaceMine(spaceMine sm){
     return sm.isDestroyed;
@@ -559,7 +647,7 @@ bool removeEnemySpaceShip(enemyShip es){
     return es.isDestroyed;
 }
 
-bool removBullets(bullet b){
+bool removeBullets(bullet b){
    return b.isDestroyed;
 }
 bool removeAsteroid(asteroid a){
@@ -568,6 +656,57 @@ bool removeAsteroid(asteroid a){
 
 bool removeEnemyBullet(enemyBullet eb){
     return eb.isDestroyed;
+}
+
+
+
+void drawAsteroids(asteroid* a){
+    glColor3ub(100,100,100);
+    glBegin(GL_POLYGON);
+    for(int j=0;j<a->nVertices;j++){
+        glVertex2d(a->xcoords[j],a->ycoords[j]);
+    }
+    glEnd();
+
+}
+
+
+void drawMoonCircle(moonCircle* c){
+    glColor3ub(120, 120, 120);
+    glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(c->moonx,c->moony);
+        for(int i=0;i<=c->triangleAmount;i++){
+            glVertex2f(c->moonx+(c->radius * cos(i*c->pi/c->triangleAmount)),
+                       c->moony+(c->radius * sin(i*c->pi/c->triangleAmount)));
+        }
+    glEnd();
+}
+
+
+void drawStars(star* s){
+    glColor3ub(255,255,255);
+    glBegin(GL_POINTS);
+            glVertex2d(s->x,s->y);
+    glEnd();
+}
+
+
+void drawSpaceMine(spaceMine* sm){
+    glColor3ub(255,0,0);
+
+    glBegin(GL_TRIANGLES);
+        glVertex2d(sm->xcoords[0],sm->ycoords[0]);
+        glVertex2d(sm->xcoords[1],sm->ycoords[1]);
+        glVertex2d(sm->xcoords[2],sm->ycoords[2]);
+    glEnd();
+
+    translate2D(0,-4.0);
+    glBegin(GL_TRIANGLES);
+        glVertex2d(sm->xcoords[3],sm->ycoords[3]);
+        glVertex2d(sm->xcoords[4],sm->ycoords[4]);
+        glVertex2d(sm->xcoords[5],sm->ycoords[5]);
+    glEnd();
+
 }
 
 void drawBullet(bullet* b){
@@ -718,14 +857,7 @@ void drawSpaceShipHit(spaceShip *s){
 
 }
 
-char* getScore(int scoreVal){
-    int length = snprintf(NULL,0,"%d",scoreVal);
-    char* str = (char*) malloc(length+1);
-    snprintf(str,length+1,"%d",scoreVal);
-    free(str);
-    return str;
 
-}
 
 void renderGame(){
 
@@ -745,8 +877,6 @@ void renderGame(){
             drawStars(&stars[i]);
         }
     }
-
-
 
 
     if(ebHit == true){
@@ -846,10 +976,10 @@ void initGame(){
     if(spaceMines.size() > 0){
         spaceMines.clear();
     }
+    initSpaceShip();
     sHitCount = S_HITCOUNT;
     bulletTimer = EB_TIMER;
     createRandomAsteroids(3);
-    initSpaceShip();
     esSpawnTimer = ES_SPAWNTIMER;
     smSpawnTimer = SM_SPAWNTIMER;
 }
@@ -981,7 +1111,7 @@ void gameKeys(unsigned char key,int x,int y){
 
 
 
-
+//main game loop
 void gameTimer(int){
 
 
@@ -1001,7 +1131,8 @@ void gameTimer(int){
 
     if(s.isDead == true){
         crashTimer = crashTimer + 1;
-        eships.clear();
+        esSpawnTimer = ES_SPAWNTIMER;
+        smSpawnTimer = SM_SPAWNTIMER;
     }else{
 
     if(gameStart == true && gameOver == false){
@@ -1185,6 +1316,7 @@ void gameTimer(int){
                         vecEnemyBullet[i].isDestroyed = true;
                         sHitCount--;
                         if(sHitCount < 1){
+                            vecEnemyBullet[i].isDestroyed = true;
                             s.isDead = true;
                             lives--;
                             PlaySound("E:\\Spring (21-22)\\Computer Graphics\\Asteroids\\shipDestroy.wav",
@@ -1247,7 +1379,7 @@ void gameTimer(int){
 
 
 
-    auto it = remove_if(vecBullet.begin(),vecBullet.end(),removBullets);
+    auto it = remove_if(vecBullet.begin(),vecBullet.end(),removeBullets);
     if(it != vecBullet.end()){
         vecBullet.erase(it);
     }
@@ -1322,23 +1454,65 @@ void instructionMenu(){
 
     glLoadIdentity();
     char* title = "INSTRUCTIONS";
-    displayText(title,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-10.0,maxH-20.0,0,255,0);
+    displayText(title,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-20.0,maxH-10.0,0,255,0);
 
     glLoadIdentity();
     char* ins1 = "Up arrow key to apply thrust";
-    displayText(ins1,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-10.0,maxH-30.0,0,255,0);
+    displayText(ins1,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-20.0,maxH-20.0,0,255,0);
 
     glLoadIdentity();
     char* ins2 = "Left/Right arrow key to rotate ship";
-    displayText(ins2,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-10.0,maxH-40.0,0,255,0);
+    displayText(ins2,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-20.0,maxH-30.0,0,255,0);
 
     glLoadIdentity();
     char* ins3 = "Space to shoot bullet";
-    displayText(ins3,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-10.0,maxH-50.0,0,255,0);
+    displayText(ins3,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-20.0,maxH-40.0,0,255,0);
 
     glLoadIdentity();
+    translate2D(eships[0].x,eships[0].y);
+    scale2d(0.5,0.5);
+    drawEnemySpaceShip(&eships[0]);
+
+    glLoadIdentity();
+    char* es1 = "Enemy ship";
+    displayText(es1,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-15.0,maxH-50.0,0,255,0);
+
+    glLoadIdentity();
+    char* es2 = "- Non destructable";
+    displayText(es2,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-15.0,maxH-55.0,0,255,0);
+
+    glLoadIdentity();
+    char* es3 = "- Upon spawn will shoot bullets. If player hits bullet 3 times it is game over";
+    displayText(es3,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-15.0,maxH-60.0,0,255,0);
+
+    glLoadIdentity();
+    char* es4 = "- Crashing onto the ship will result in game over aswell";
+    displayText(es4,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-15.0,maxH-65.0,0,255,0);
+
+    glLoadIdentity();
+    translate2D(spaceMines[0].x,spaceMines[0].y);
+    scale2d(0.5,0.5);
+    drawSpaceMine(&spaceMines[0]);
+
+    glLoadIdentity();
+    char* sm1 = "Space mine";
+    displayText(sm1,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-15.0,maxH-70.0,0,255,0);
+    glLoadIdentity();
+
+    glLoadIdentity();
+    char* sm2 = "- Non Destructible";
+    displayText(sm2,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-15.0,maxH-75.0,0,255,0);
+    glLoadIdentity();
+
+    glLoadIdentity();
+    char* sm3 = "- Upon crashing into it will result in game over";
+    displayText(sm3,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-15.0,maxH-80.0,0,255,0);
+    glLoadIdentity();
+
+
+
     char* txt = "Press BackSpace to go back to main menu";
-    displayText(txt,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-10.0,maxH-60.0,0,255,0);
+    displayText(txt,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-20.0,maxH-95.0,0,255,0);
 
     glutSwapBuffers();
 }
@@ -1347,6 +1521,8 @@ void instructionTimer(int){
     if(vIns == false){
         glutTimerFunc(33,startMenuTimer,0);
         glutDisplayFunc(menu);
+        eships.clear();
+        spaceMines.clear();
     }
     else{
         glutPostRedisplay();
@@ -1531,7 +1707,6 @@ void gameOverTimer(int){
                 glutTimerFunc(33,gameTimer,0);
                 glutDisplayFunc(renderGame);
                 initGame();
-                spawnSpaceMine();
                 generateStars();
             }
         }
@@ -1565,6 +1740,8 @@ void startMenuTimer(int){
          exitGame =false;
          glutTimerFunc(33,instructionTimer,0);
          glutDisplayFunc(instructionMenu);
+         spawnExampleEnemyShip();
+         spawnExampleSpaceMine();
     }
     else if(exitGame == true){
         stageSelect = false;
@@ -1638,14 +1815,10 @@ void menu(){
         displayText(restartGametxt,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-10.0,maxH-70.0,0,255,0);
     }
 
-
-
     glLoadIdentity();
     char * title = "ASTEROIDS";
     displayText(title,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-5.0,maxH-20.0,0,255,0);
     glLoadIdentity();
-//    char * startIns = "PRESS F1 to start game";
-//    displayText(startIns,GLUT_BITMAP_HELVETICA_18,(maxW/2.0)-10.0,maxH-50.0,0,255,0);
 
     glLoadIdentity();
         char * nav = "Up and down arrow key to navigate ,Press Enter to select";
@@ -1671,7 +1844,6 @@ int main(int argc,char** argv){
     glutSpecialUpFunc(releseInput);
     glutTimerFunc(33,startMenuTimer,0);
     initBg();
-
 
     glutMainLoop();
 
